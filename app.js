@@ -36,6 +36,7 @@ let consumers = [];
 let transports = [];
 let peers = {};
 let rooms = {};
+const groupSocketsMap = {};
 // Creation of Worker
 app.use(cors());
 
@@ -78,9 +79,15 @@ const mediacodecs = [
 
 const updateAndBroadcastUserCount = (roomName) => {
   const userCount = Object.keys(rooms[roomName]?.peers || {}).length;
-  console.log(userCount)
-  io.to(roomName).emit("user-count-updated", { userCount});
-}
+  console.log(userCount);
+   // Get the array of socket IDs for the given room
+   const socketIds = groupSocketsMap[roomName] || [];
+  
+   // Emit the event only to sockets in the same group
+   socketIds.forEach(socketId => {
+     io.to(socketId).emit("user-count-updated", { userCount });
+   });
+};
 //io.emit sends the info to all the sockets connected
 
 io.on("connection", async (socket) => {
@@ -440,6 +447,18 @@ io.on("connection", async (socket) => {
       }
     });
   });
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1); // Exit the process after logging the error
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection:', err);
+  process.exit(1); // Exit the process after logging the error
 });
 
 httpServer.listen(port, () => {
